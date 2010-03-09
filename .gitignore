@@ -1,7 +1,8 @@
 *_local.conf
-blib/*
-inc/*
+blib
+inc
 Makefile.old
+Makefile
 META.yml
 pm_to_blib
 *.swp
