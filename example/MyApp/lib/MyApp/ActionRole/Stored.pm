@@ -25,6 +25,10 @@ after execute => sub {
 sub store {
     my ( $self, $c ) = @_;
 
+    if ( my $base_dir = $c->config->{'ActionRole::Stored'}{base_dir} ) {
+        $self->base_dir($base_dir);
+    }
+
     my $file = $self->base_dir->file( $c->req->path . $self->file_extension($c->res) );
     $c->log->info('Saving into: ' . $file );
     $file->dir->mkpath;

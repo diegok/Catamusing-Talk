@@ -5,12 +5,17 @@ use namespace::autoclean;
 BEGIN {extends 'Catalyst::Controller::ActionRole'; }
     with 'MyApp::ControllerRole::Foo';
 
-#__PACKAGE__->config( action_roles => ['Stored'] );
+has saludo => (
+    is => 'ro',
+    isa => 'Str',
+    lazy => 1,
+    default => sub { 'Hola mundo!' },
+);
 
 sub hello : Path('hello') Does('Stored') {
     my ($self, $c) = @_;
     $c->res->content_type('text/plain');
-    $c->res->body('Hola mundo!');
+    $c->res->body( $self->saludo );
 }
 
 =head1 NAME

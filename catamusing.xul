@@ -11,7 +11,7 @@
 <!-- Built-in Content --> 
 <html:textarea id="builtinCode" style="visibility: collapse">
 TITLE::Catamusing
-FOOTER::FreeKey::Labs
+FOOTER::FreekeyLabs
 GLOBAL-SIZE::9
 [[EM:Catamusing]]
 
@@ -32,7 +32,7 @@ Catalyst 5.8
 (Catamoose)
 ----
 Catalyst 5.8
-13 de Octubre de 2008
+Abril de 2009
 ----
 ALIGN::left
 Deprecation policy
@@ -102,18 +102,30 @@ use Moose;
 use namespace::autoclean;
 BEGIN { extends 'Catalyst::Controller' };
 
+has saludo => (
+    is => 'ro',
+    isa => 'Str',
+    default => sub { 'Hola' },
+);
+
 sub foo : Local { 
     my ($self, $c) = @_;
-    $c->res->body('Hola');
+    $c->res->body( $self->saludo );
 }
 
 after foo => sub {
     my ($self, $c) = @_;
-    $c->res->body($c->res->body . ' Mundo');
+    $c->res->body($c->res->body . '!!!');
 };
 
 __PACKAGE__->meta->make_immutable;
 1;
+----
+/myapp_local.conf
+
+&lt;Controller::Example&gt;
+    saludo  Hola mongers
+&lt;/Controller::Example&gt;
 ----
 Roles para
 controladores
@@ -150,7 +162,7 @@ extends 'Catalyst::Action';
 
 after execute => sub {
     my ( $self, $controller, $c ) = @_;
-    $self->store_plain( $c ) if $c->res->code == 200;
+    $self->store( $c ) if $c->res->code == 200;
 };
 
 ...
@@ -213,7 +225,6 @@ sub hello : Path('hello')
             [[ActionClass('+MyApp::Action::Stored')]] {
 
     my ($self, $c) = @_;
-    $c->res->content_type('text/plain');
     $c->res->body('Hola mundo!');
 }
 
@@ -227,7 +238,6 @@ BEGIN {extends 'Catalyst::Controller'; }
 
 sub hello : Path('hello') [[Stored]] {
     my ($self, $c) = @_;
-    $c->res->content_type('text/plain');
     $c->res->body('Hola mundo!');
 }
 
@@ -242,8 +252,8 @@ use namespace::autoclean;
 BEGIN {extends 'Catalyst::Controller'; }
 
 sub hello : Path('hello') 
-            ActionClass('Foo') 
-            ActionClass('Bar') {
+            ActionClass('Stored') 
+            ActionClass('Reported') {
     ...
 }
 ----
@@ -255,10 +265,133 @@ use Moose;
 use namespace::autoclean;
 [[BEGIN { extends 'Catalyst::Controller::ActionRole'; }]]
 
-sub hello : Path('hello') [[Does('Foo')]] [[Does('Bar')]] {
+sub hello : Path('hello') 
+            [[Does('Stored')]] 
+            [[Does('Reported')]] {
     ...
 }
 ----
+ALIGN::left
+[[package MyApp::ActionRole::Stored;]]
+[[use Moose::Role;]]
+
+after execute => sub {
+    my ( $self, $controller, $c ) = @_;
+    $self->store( $c ) if $c->res->code == 200;
+};
+
+...
+
+1;
+----
+Roles hasta
+en la sopa
+----
+Componentes de catalyst
+
+Request
+Response
+Engine
+Dispatcher
+Stats 
+----
+ALIGN::left
+package MyApp;
+
+use base 'Catalyst';
+use Catalyst;
+[[use CatalystX::RoleApplicator;]]
+
+__PACKAGE__->apply_request_class_roles( qw/
+    Catalyst::TraitFor::Request::BrowserDetect
+    Catalyst::TraitFor::Request::XMLHttpRequest
+/ );
+----
+CPAN
+
+Catalyst::TraitFor::Controller::*
+Catalyst::TraitFor::Model::*
+Catalyst::TraitFor::Request::*
+Catalyst::TraitFor::Log::*
+Catalyst::TraitFor::View::*
+
+----
+Componentes de la App
+via config
+
+CatalystX::Component::Traits
+----
+[[PRE:
+
+package MyApp::Model::DB;
+use Moose;
+use namespace::autoclean;
+extends 'Catalyst::Model::DBCI::Schema';
+
+__PACKAGE__->config(
+    traits          => ['Caching'],
+    connect_info    => ['dbi:mysql:db', 'user', 'pass'],
+);
+
+1;
+
+]]
+
+[[PRE:
+&lt;MyApp::Model::DB&gt;
+    connect_info   dbi:mysql:db
+    connect_info   user
+    connect_info   pass
+    traits   Caching
+&lt;/MyApp::Model::DB&gt;
+]]
+----
+ALIGN::left
+sub item : Chained('/') PathPart('item') CaptureArgs(1) {
+    my ( $self, $c, $id ) = @_;
+
+    $c->stash(
+        item => $c->model('DB::Item')->find( $id, [[{ cache_for => 9600 }]] );
+    );
+}
+----
+No usar todo esto
+para hacer apps
+gordas!
+----
+"Catalyst is
+just glue"
+----
+Mejor [[ab]]usar
+modelos y vistas
+----
+Thin Controller
+Smart Model
+----
+ALIGN::left
+package MyApp::Model::DonMendo;
+use base 'Catalyst::Model::Adaptor';
+__PACKAGE__->config( class => 'Don::Mendo' );
+
+1;
+----
+ALIGN::left
+package MyApp::Controller::DonMendo;
+use Moose;
+use namespace::autoclean;
+BEGIN { extends 'Catalyst::Controller' }
+
+sub say : Local {
+    my ( $self, $c ) = @_;
+
+    my $lines = $c->model('DonMendo')->jornadas->[ int rand(4) ]
+        ->lines_for_character('Mendo');
+    $c->res->body( $lines->[ time % scalar @$lines ]->say );
+}
+
+1;
+----
+
 ----
 Preguntas?
 ----
