@@ -1,0 +1,8 @@
+git clone http://github.com/diegok/Catamusing-Talk.git
+cd Catamusing-Talk/example/MyApp
+perl Makefile.pl
+sudo make installdeps
+
+# Correr aplicacion con los ejemplos
+./script/myapp_server.pl 
+

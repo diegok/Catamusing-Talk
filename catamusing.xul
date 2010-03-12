@@ -11,7 +11,6 @@
 <!-- Built-in Content --> 
 <html:textarea id="builtinCode" style="visibility: collapse">
 TITLE::Catamusing
-FOOTER::FreekeyLabs
 GLOBAL-SIZE::9
 Catamusing
 
@@ -42,7 +41,43 @@ Deprecation policy
  - __PACKAGE__->mk_accessors() 
    - Usar Moose 'has'
 ----
-(ejemplo de MRO::Compat)
+[[PRE:
+package Catalyst::Plugin::SessionLang;
+use strict;
+use NEXT;
+
+sub dispatch {
+    my $c = shift;
+
+    if( $c->session ) {
+        if( $c->session->{selected_language} ) {
+            $c->languages([ $c->session->{selected_language} ]);
+        }
+    }
+    $c->NEXT::dispatch( @_ );
+}
+]]
+
+Catalyst::Plugin::SessionLang uses NEXT, which is deprecated. 
+Please see the Class::C3::Adopt::NEXT documentation for details. 
+NEXT used  at /.../Catalyst/Plugin/SessionLang.pm line 12
+
+[[PRE:
+package Catalyst::Plugin::SessionLang;
+use strict;
+use MRO::Compat;
+
+sub dispatch {
+    my $c = shift;
+
+    if( $c->session ) {
+        if( $c->session->{selected_language} ) {
+            $c->languages([ $c->session->{selected_language} ]);
+        }
+    }
+    return $c->next::method( @_ );
+}
+]]
 ----
 Moosificando
 MyApp
@@ -96,7 +131,7 @@ Moosificando un controlador
 (por defecto en apps nuevas)
 ----
 ALIGN::left
-package MyApp::Controller::Foo;
+package MyApp::Controller::Example;
 use Moose;
 use namespace::autoclean;
 BEGIN { extends 'Catalyst::Controller' };
@@ -283,6 +318,40 @@ after execute => sub {
 
 1;
 ----
+[[PRE:
+package MyApp::Controller::Foo;
+use Moose;
+use namespace::autoclean;
+BEGIN { extends 'Catalyst::Controller::ActionRole'; }
+
+__PACKAGE__->config( action_roles => ['MatchRequestMethod'] );
+
+sub get_foo    : Path Method('GET')                { ... }
+sub update_foo : Path Method('POST')               { ... }
+sub create_foo : Path Method('PUT')                { ... }
+sub delete_foo : Path Method('DELETE')             { ... }
+sub foo        : Path Method('GET') Method('POST') { ... }
+]]
+
+http://search.cpan.org/~bobtfish/Catalyst-ActionRole-MatchRequestMethod-0.02/
+[[PRE:
+package Catalyst::ActionRole::MatchRequestMethod;
+use Moose::Role;
+use Perl6::Junction 'none';
+use namespace::autoclean;
+
+requires 'attributes';
+
+around match => sub {
+    my ($orig, $self, $ctx) = @_;
+    my @methods = @{ $self->attributes->{Method} || [] };
+    return 0 if @methods &amp;&amp; $ctx->request->method eq none @methods;
+    return $self->$orig($ctx);
+};
+
+1;
+]]
+----
 Roles hasta
 en la sopa
 ----
@@ -315,7 +384,7 @@ Catalyst::TraitFor::Log::*
 Catalyst::TraitFor::View::*
 
 ----
-Componentes de la App
+Roles en componentes
 via config
 
 CatalystX::Component::Traits
