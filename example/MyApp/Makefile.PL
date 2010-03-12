@@ -20,6 +20,8 @@ requires 'MooseX::Types::Path::Class';
 requires 'MIME::Types';
 requires 'Don::Mendo';
 
+recommends 'Plack';
+recommends 'Starman';
 
 test_requires 'Test::More' => '0.88';
 catalyst;

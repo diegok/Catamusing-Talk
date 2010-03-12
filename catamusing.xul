@@ -423,9 +423,9 @@ sub item : Chained('/') PathPart('item') CaptureArgs(1) {
     );
 }
 ----
-No usar todo esto
-para hacer apps
-gordas!
+Usar todo esto
+para no hacer 
+apps gordas!
 ----
 "Catalyst is
 just glue"
@@ -691,6 +691,15 @@ sub create : PathPart( 'domain/create' ) Chained( '/auth/need_login' ) Args( 0 )
     }
 }
 ]]
+----
+PSGI
+----
+Catalyst::Engine::PSGI
+script/myapp_create.pl PSGI
+----
+plackup script/myapp.psgi
+----
+starman script/myapp.psgi
 ----
 ----
 Preguntas?
