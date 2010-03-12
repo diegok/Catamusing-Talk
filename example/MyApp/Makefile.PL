@@ -15,8 +15,10 @@ requires 'Moose';
 requires 'namespace::autoclean';
 requires 'Config::General';
 requires 'Catalyst::Controller::ActionRole';
+requires 'Catalyst::Model::Adaptor';
 requires 'MooseX::Types::Path::Class';
 requires 'MIME::Types';
+requires 'Don::Mendo';
 
 
 test_requires 'Test::More' => '0.88';

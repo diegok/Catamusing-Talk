@@ -13,15 +13,14 @@
 TITLE::Catamusing
 FOOTER::FreekeyLabs
 GLOBAL-SIZE::9
-[[EM:Catamusing]]
+Catamusing
 
 Medialab - Madrid
 12/3/2010 
 ----
 Hola!
 ----
-Modern
-Catalyst
+git clone http://github.com/diegok/Catamusing-Talk.git
 ----
 Catalyst
 +
@@ -375,7 +374,8 @@ __PACKAGE__->config( class => 'Don::Mendo' );
 
 1;
 ----
-ALIGN::left
+Que hable Don Mendo!
+[[PRE:
 package MyApp::Controller::DonMendo;
 use Moose;
 use namespace::autoclean;
@@ -390,8 +390,239 @@ sub say : Local {
 }
 
 1;
+]]
 ----
+Modelo DBIC
+(more glue)
+----
+[[PRE:
+package postadmin::Model::Postfix;
 
+use strict;
+use base 'Catalyst::Model::DBIC::Schema';
+
+__PACKAGE__->config( schema_class => 'postadmin::Schema' );
+
+1;
+]]
+
+[[PRE:
+&lt;Model::Postfix&gt;
+    &lt;connect_info&gt;
+        dsn   dbi:mysql:postfix
+        user  root
+    &lt;/connect_info&gt;
+&lt;/Model::Postfix&gt;
+]]
+----
+Lo que no sea web
+en el Schema
+----
+postadmin::Schema::Result::*
+
+Componentes y metodos de 'row'
+
+[[PRE:
+__PACKAGE__->load_components( 
+    "+postadmin::Schema::Component::AutoLog", 
+    "TimeStamp", 
+    "Core"
+);
+
+sub fullname { $_[0]->name . ' ' . $_[0]->surname }
+
+sub insert {
+    my $self = shift;
+    if ( $self->next::method( @_ ) ) {
+        $self->result_source->schema->resultset('Log')
+        ->create({
+            message => 'Creado nuevo item: ' . $self->id
+        });
+    }
+    return $self;
+}
+]]
+----
+postadmin::Schema::ResultSet::*
+
+Metodos de la tabla (rs)
+
+[[PRE:
+sub upcoming {
+    $_[0]->search( 
+        { date_start => { '>', DateTime->now } },  
+        { order_by   => 'date_start ASC' }
+    );
+}
+]]
+----
+Testear el 
+Schema sin
+la App :)
+----
+ALIGN::left
+package TestSchema;
+
+use strict;
+use warnings;
+
+[[use DBICx::TestDatabase;]]
+
+sub new { DBICx::TestDatabase->new( 'postadmin::Schema' ) }
+
+1;
+----
+ALIGN::left
+use strict;
+use warnings;
+use Test::More 'no_plan';
+
+use lib 't/lib';
+BEGIN { use_ok 'TestSchema' }
+
+ok ( my $schema = TestSchema->new(), 'Create a schema object' );
+isa_ok ( $schema, 'postadmin::Schema');
+
+ok ( my $domain_rs = $schema->resultset('Domain'), 'Schema has Domain RS' );
+ok( my $domain_item = $domain_rs->create( { ... } ), 'Create a new domain' );
+ok( my $log = $domain_item->log(), 'Log exists for domain' );
+----
+Forms con Moose
+----
+[[PRE:
+package postadmin::Form::Login;
+
+use HTML::FormHandler::Moose;
+    extends 'HTML::FormHandler';
+    with 'postadmin::Form::Render::FreeKey';
+
+use Email::Valid;
+
+has_field 'username' => ( type => 'Text', required => 1, apply => [
+    {
+        check   => sub { Email::Valid->address( $_[0] ) },
+        message => 'Must be your email address'
+    }
+]);
+has_field 'password' => ( type => 'Password', required => 1 );
+
+has_field 'submit'   => ( widget => 'submit' );
+
+no HTML::FormHandler::Moose;
+1;
+]]
+----
+[[PRE:
+package postadmin::Controller::Auth;
+use Moose; BEGIN { extends 'Catalyst::Controller'; }
+use postadmin::Form::Login;
+
+sub login : Path(/login) Args(0) {
+    my ( $self, $c ) = @_;
+    my $form = postadmin::Form::Login->new();
+
+    if ( $form->process( params => $c->req->params ) ) {
+        # login here!
+        if ( $c->authenticate( {
+                username => $form->value->{username},
+                password => $form->value->{password}
+            } ) )
+        {
+            $c->detach('after_login_redirect');
+        }
+        else {
+            $form->field('password')->add_error('Invalid password');
+        }
+    }
+
+    $c->stash(
+        template => 'auth/login.page',
+        form     => $form
+    );
+}
+]]
+----
+[[PRE:
+package postadmin::Form::Domain;
+use HTML::FormHandler::Moose;
+extends 'HTML::FormHandler::Model::DBIC';
+
+use Email::Valid;
+
+has '+item_class' => ( default => 'Domain' );
+
+has_field 'domain' => (
+    type      => 'Text',
+    maxlength => 255,
+    required  => 1,
+    apply     => [
+        {
+            check   => sub { Email::Valid->address( 'fakeuser@' . $_[0] ) },
+            message => 'Must be a valid domain name'
+        }
+    ]
+);
+has_field 'description'   => ( type => 'Text', maxlength => 255, required => 1 );
+has_field 'max_mailboxes' => ( type => 'PosInteger', required => 1, default => 10 );
+has_field 'max_aliases'   => ( type => 'PosInteger', required => 1, default => 10 );
+has_field 'maxquota'  => ( type => 'PosInteger', required => 1, default => 0 );
+has_field 'active'    => ( type => 'Checkbox',   default  => 1 );
+has_field 'backupmx'  => ( type => 'Checkbox' );
+has_field 'transport' => ( type => 'Hidden', default => 'virtual' );
+has_field 'submit'    => ( widget => 'submit' );
+
+no HTML::FormHandler::Moose;
+1;
+]]
+----
+[[PRE:
+package postadmin::Controller::Domain;
+use Moose; BEGIN { extends 'Catalyst::Controller' }
+use postadmin::Form::Domain;
+
+sub element_chain : PathPart( 'domain' ) Chained( '/auth/need_login' ) CaptureArgs( 1 ) {
+    my ( $self, $c, $domain_name ) = @_;
+
+    unless ( $c->stash->{domain} = $c->model('Postfix::Domain')->find( $domain_name ) ) {
+        $c->detach( '/error/element_not_found', [ 'domain' ] );
+    }
+}
+
+sub edit : PathPart( 'edit' ) Chained( 'element_chain' ) Args( 0 ) {
+    my ( $self, $c ) = @_;
+    my $domain = $c->stash->{domain};
+    my $form = postadmin::Form::Domain->new;
+
+    if ( $form->process( item => $domain, params => $c->req->params ) ) {
+        $c->add_feedback( info  => 'Domain ' . $domain->domain . ' saved' );
+        $c->res->redirect( $c->uri_for('/domain') );
+    }
+    else {
+        $c->stash(
+            template => 'domain/edit.tt',
+            form     => $form
+        );
+    }
+}
+
+sub create : PathPart( 'domain/create' ) Chained( '/auth/need_login' ) Args( 0 ) {
+    my ( $self, $c ) = @_;
+    my $form = postadmin::Form::Domain->new;
+    my $domain = $c->model('Postfix::Domain')->new_result( {} );
+
+    if ( $form->process( item => $domain, params => $c->req->params ) ) {
+        $c->add_feedback( info  => 'Domain ' . $domain->domain . ' created' );
+        $c->res->redirect( $c->uri_for('/domain') );
+    }
+    else {
+        $c->stash(
+            template => 'domain/create.tt',
+            form     => $form
+        );
+    }
+}
+]]
+----
 ----
 Preguntas?
 ----
